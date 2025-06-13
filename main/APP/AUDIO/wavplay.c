@@ -44,6 +44,8 @@ esp_err_t i2s_play_end = ESP_FAIL;         /* 播放结束标志位 */
 esp_err_t i2s_play_next_prev = ESP_FAIL;   /* 下一首或者上一首标志位 */
 FSIZE_t file_read_pos = 0;                 /* 记录当前WAV读取位置 */
 
+bool g_playing = false; /* 是否正在播放 */
+
 /**
  * @brief       WAV解析初始化
  * @param       fname : 文件路径+文件名
@@ -229,7 +231,8 @@ uint8_t wav_play_song(uint8_t *fname)
 {
     uint8_t key = 0;
     uint8_t res = 0;
-
+    g_playing = true; /* 设置正在播放标志位 */
+    ESP_LOGI("WAVEPLAY", "Start playing %s", fname);
     i2s_play_end = ESP_FAIL;
     i2s_play_next_prev = ESP_FAIL;
     g_audiodev.file = (FIL *)heap_caps_malloc(sizeof(FIL), MALLOC_CAP_DMA);
@@ -280,42 +283,42 @@ uint8_t wav_play_song(uint8_t *fname)
                             break;
                         }
 
-                        key = xl9555_key_scan(0);
+                        // key = xl9555_key_scan(0);
 
-                        switch (key)
-                        {
-                        /* 下一首/上一首 */
-                        case KEY0_PRES:
-                        case KEY1_PRES:
-                            i2s_play_next_prev = ESP_OK;
-                            break;
-                        /* 暂停/开启 */
-                        case KEY2_PRES:
-                            if ((g_audiodev.status & 0x0F) == 0x03)
-                            {
-                                audio_stop();
-                            }
-                            else if ((g_audiodev.status & 0x0F) == 0x00)
-                            {
-                                audio_start();
-                            }
-                            break;
-                        }
+                        // switch (key)
+                        // {
+                        // /* 下一首/上一首 */
+                        // case KEY0_PRES:
+                        // case KEY1_PRES:
+                        //     i2s_play_next_prev = ESP_OK;
+                        //     break;
+                        // /* 暂停/开启 */
+                        // case KEY2_PRES:
+                        //     if ((g_audiodev.status & 0x0F) == 0x03)
+                        //     {
+                        //         audio_stop();
+                        //     }
+                        //     else if ((g_audiodev.status & 0x0F) == 0x00)
+                        //     {
+                        //         audio_start();
+                        //     }
+                        //     break;
+                        // }
 
-                        if ((g_audiodev.status & 0x0F) == 0x03) /* 暂停不刷新时间 */
-                        {
-                            wav_get_curtime(g_audiodev.file, &wavctrl); /* 得到总时间和当前播放的时间 */
-                            audio_msg_show(wavctrl.totsec, wavctrl.cursec, wavctrl.bitrate);
-                        }
+                        // if ((g_audiodev.status & 0x0F) == 0x03) /* 暂停不刷新时间 */
+                        // {
+                        //     wav_get_curtime(g_audiodev.file, &wavctrl); /* 得到总时间和当前播放的时间 */
+                        //     audio_msg_show(wavctrl.totsec, wavctrl.cursec, wavctrl.bitrate);
+                        // }
 
                         vTaskDelay(pdMS_TO_TICKS(10));
                     }
 
-                    if (key == KEY1_PRES || key == KEY0_PRES) /* 退出切换歌曲 */
-                    {
-                        res = key;
-                        break;
-                    }
+                    // if (key == KEY1_PRES || key == KEY0_PRES) /* 退出切换歌曲 */
+                    // {
+                    //     res = key;
+                    //     break;
+                    // }
                 }
             }
             else
@@ -338,5 +341,8 @@ uint8_t wav_play_song(uint8_t *fname)
     g_audiodev.tbuf = NULL;
     g_audiodev.file = NULL;
     MUSICTask_Handler = NULL;
+    ESP_LOGI("WAVEPLAY", "End playing %s, res: %d", fname, res);
+    
+    g_playing = false; /* 设置未播放标志位 */
     return res;
 }

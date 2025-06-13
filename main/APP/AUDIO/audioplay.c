@@ -4,7 +4,12 @@ TaskHandle_t EKYTask_Handler; /* 任务句柄 */
 const char *audio_play_tag = "audio";
 void key_task(void *pvParameters); /* 任务函数 */
 
+static portMUX_TYPE my_spinlock = portMUX_INITIALIZER_UNLOCKED;
+
 __audiodev g_audiodev; /* 音乐播放控制器 */
+
+const char *WAVE_3_FILE_NAME = "0:/MUSIC/3.wav";
+extern bool g_playing; /* 是否正在播放 */
 
 /**
  * @brief       开始音频播放
@@ -189,13 +194,32 @@ FRESULT atk_dir_sdi(FF_DIR *dp, DWORD ofs)
 
 void key_task(void *pvParameters)
 {
+    uint8_t key;
     pvParameters = pvParameters;
     while (1)
     {
         // delay 1s
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        ESP_LOGI(audio_play_tag, "Key task running");
+        // vTaskDelay(pdMS_TO_TICKS(1000));
+        // ESP_LOGI(audio_play_tag, "Key task running");
+
+        key = xl9555_key_scan(0);
+        if (key == KEY1_PRES)
+        {
+            ESP_LOGI(audio_play_tag, "Key pressed");
+            // play wave_0_file_name
+            if (g_playing)
+            {
+                ESP_LOGI(audio_play_tag, "Playing no intterupt");
+            }
+            else
+            {
+                wav_play_song(WAVE_3_FILE_NAME);
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
+
+    vTaskDelete(NULL);
 }
 
 /**
@@ -272,41 +296,57 @@ void audio_play(void)
         }
     }
 
+    taskENTER_CRITICAL(&my_spinlock);
+    xTaskCreate(key_task, "key", 4096, &EKYTask_Handler, 5, NULL);
+    taskEXIT_CRITICAL(&my_spinlock);
+
+    ESP_LOGI(audio_play_tag, "Enter main while");
+
     curindex = 0; /* 从0开始显示 */
     res = f_opendir(&wavdir, (const TCHAR *)"0:/MUSIC");
 
-    xTaskCreate(key_task, "music", 4096, &EKYTask_Handler, 5, NULL);
+    while (1)
+    {
+
+        ESP_LOGI(audio_play_tag, "Main while loop");
+
+        // delay 1s
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
 
     while (res == FR_OK) /* 打开目录 */
     {
+        ESP_LOGI(audio_play_tag, "1");
         atk_dir_sdi(&wavdir, wavoffsettbl[curindex]); /* 改变当前目录索引 */
+        ESP_LOGI(audio_play_tag, "2");
 
         res = f_readdir(&wavdir, wavfileinfo); /* 读取文件 */
 
         if ((res != FR_OK) || (wavfileinfo->fname[0] == 0))
         {
+            ESP_LOGE(audio_play_tag, "f_readdir error");
             break;
         }
 
+        ESP_LOGI(audio_play_tag, "3");
         strcpy((char *)pname, "0:/MUSIC/");
         strcat((char *)pname, (const char *)wavfileinfo->fname);
+        ESP_LOGI(audio_play_tag, "4");
         spilcd_fill(30, 190, spilcddev.width, spilcddev.height, WHITE);
         audio_index_show(curindex + 1, totwavnum);
+        ESP_LOGI(audio_play_tag, "5");
         text_show_string(30, 190, 300, 16, (char *)wavfileinfo->fname, 16, 0, BLUE);
+        ESP_LOGI(audio_play_tag, "6");
         // key = audio_play_song(pname);
 
-        // ESP_LOGI(audio_play_tag, "Playing: %s", pname);
+        ESP_LOGI(audio_play_tag, "Playing: %s", pname);
 
         // delay 1s
-        // vTaskDelay(pdMS_TO_TICKS(1000));
-        key = xl9555_key_scan(0);
-        if (key == KEY1_PRES)
-        {
-            ESP_LOGI(audio_play_tag, "Eey pressed");
-            audio_stop();
-            wav_play_song(pname);
-            // vTaskDelay(pdMS_TO_TICKS(100));
-        }
+        vTaskDelay(pdMS_TO_TICKS(1000));
+
+        // 打印系统剩余内存
+        // ESP_LOGI(audio_play_tag, "Free heap size: %d ", esp_get_free_heap_size());
+        // ESP_LOGI(audio_play_tag, "Internal free heap size: %d ", esp_get_free_heap_size());
 
         // if (key == KEY1_PRES) /* 上一首 */
         // {
