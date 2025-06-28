@@ -1,4 +1,4 @@
-#include "audioplay.h"
+#include "user_comm.h"
 
 TaskHandle_t EKYTask_Handler; /* 任务句柄 */
 const char *audio_play_tag = "audio";
@@ -8,7 +8,6 @@ static portMUX_TYPE my_spinlock = portMUX_INITIALIZER_UNLOCKED;
 
 __audiodev g_audiodev; /* 音乐播放控制器 */
 
-const char *WAVE_3_FILE_NAME = "0:/MUSIC/3.wav";
 extern bool g_playing; /* 是否正在播放 */
 
 /**
@@ -194,6 +193,7 @@ FRESULT atk_dir_sdi(FF_DIR *dp, DWORD ofs)
 
 void key_task(void *pvParameters)
 {
+    static uint8_t speaker_vol = 0x20; /* 初始音量 */
     uint8_t key;
     pvParameters = pvParameters;
     while (1)
@@ -213,8 +213,33 @@ void key_task(void *pvParameters)
             }
             else
             {
-                wav_play_song(WAVE_3_FILE_NAME);
+                // wav_play_song(WAVE_3_FILE_NAME);
             }
+        }
+        else if (key == KEY2_PRES)
+        {
+            if (speaker_vol == 0x01)
+            {
+                speaker_vol = 0x00; /* 最小音量 */
+            }
+            else
+            {
+                speaker_vol--;
+            }
+            es8388_spkvol_set(speaker_vol);
+            ESP_LOGI(audio_play_tag, "Vol: %d", speaker_vol );
+        }
+        else if (key == KEY3_PRES)
+        {
+            speaker_vol++;
+            if (speaker_vol > 33)
+            {
+                speaker_vol = 33; /* 最大音量 */
+            }
+            es8388_spkvol_set(speaker_vol);
+
+            ESP_LOGI(audio_play_tag, "Vol: %d", speaker_vol );
+
         }
         vTaskDelay(pdMS_TO_TICKS(10));
     }
@@ -263,10 +288,11 @@ void audio_play(void)
 
     while (!wavfileinfo || !pname || !wavoffsettbl)
     {
-        text_show_string(30, 190, 240, 16, "内存分配失败!", 16, 0, BLUE);
+        ESP_LOGW(audio_play_tag, "Memory allocation failed");
+        // text_show_string(30, 190, 240, 16, "内存分配失败!", 16, 0, BLUE);
         vTaskDelay(200);
-        spilcd_fill(30, 190, 240, 146, WHITE);
-        vTaskDelay(200);
+        // spilcd_fill(30, 190, 240, 146, WHITE);
+        // vTaskDelay(200);
     }
 
     res = f_opendir(&wavdir, "0:/MUSIC");
@@ -296,9 +322,9 @@ void audio_play(void)
         }
     }
 
-    taskENTER_CRITICAL(&my_spinlock);
-    xTaskCreate(key_task, "key", 4096, &EKYTask_Handler, 5, NULL);
-    taskEXIT_CRITICAL(&my_spinlock);
+    // taskENTER_CRITICAL(&my_spinlock);
+    // xTaskCreate(key_task, "key", 4096, &EKYTask_Handler, 5, NULL);
+    // taskEXIT_CRITICAL(&my_spinlock);
 
     ESP_LOGI(audio_play_tag, "Enter main while");
 
@@ -308,10 +334,12 @@ void audio_play(void)
     while (1)
     {
 
-        ESP_LOGI(audio_play_tag, "Main while loop");
-
+        // ESP_LOGI(audio_play_tag, "Main while loop");
         // delay 1s
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        // vTaskDelay(pdMS_TO_TICKS(1000));
+        uart_recv();
+
+        vTaskDelay(pdMS_TO_TICKS(10)); /* 延时10ms */
     }
 
     while (res == FR_OK) /* 打开目录 */

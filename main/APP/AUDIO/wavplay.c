@@ -1,23 +1,3 @@
-/**
- ****************************************************************************************************
- * @file        wavplay.c
- * @author      正点原子团队(ALIENTEK)
- * @version     V1.0
- * @date        2025-01-01
- * @brief       wav解码 代码
- * @license     Copyright (c) 2020-2032, 广州市星翼电子科技有限公司
- ****************************************************************************************************
- * @attention
- *
- * 实验平台:正点原子 ESP32-S3 开发板
- * 在线视频:www.yuanzige.com
- * 技术论坛:www.openedv.com
- * 公司网址:www.alientek.com
- * 购买地址:openedv.taobao.com
- *
- ****************************************************************************************************
- */
-
 #include "wavplay.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -107,14 +87,14 @@ uint8_t wav_decode_init(uint8_t *fname, __wavctrl *wavx)
                     wavx->datasize = data->ChunkSize;
                     wavx->datastart = wavx->datastart + 8;
 
-                    printf("wavx->audioformat:%d\r\n", wavx->audioformat);
-                    printf("wavx->nchannels:%d\r\n", wavx->nchannels);
-                    printf("wavx->samplerate:%ld\r\n", wavx->samplerate);
-                    printf("wavx->bitrate:%ld\r\n", wavx->bitrate);
-                    printf("wavx->blockalign:%d\r\n", wavx->blockalign);
-                    printf("wavx->bps:%d\r\n", wavx->bps);
-                    printf("wavx->datasize:%ld\r\n", wavx->datasize);
-                    printf("wavx->datastart:%ld\r\n", wavx->datastart);
+                    // printf("wavx->audioformat:%d\r\n", wavx->audioformat);
+                    // printf("wavx->nchannels:%d\r\n", wavx->nchannels);
+                    // printf("wavx->samplerate:%ld\r\n", wavx->samplerate);
+                    // printf("wavx->bitrate:%ld\r\n", wavx->bitrate);
+                    // printf("wavx->blockalign:%d\r\n", wavx->blockalign);
+                    // printf("wavx->bps:%d\r\n", wavx->bps);
+                    // printf("wavx->datasize:%ld\r\n", wavx->datasize);
+                    // printf("wavx->datastart:%ld\r\n", wavx->datastart);
                 }
                 else
                 {
@@ -164,12 +144,16 @@ void music(void *pvParameters)
     pvParameters = pvParameters;
 
     /* ES8388初始化配置，有效降低启动时发出沙沙声 */
-    es8388_adda_cfg(1, 0);          /* 打开DAC，关闭ADC */
-    es8388_input_cfg(0);            /* 录音关闭 */
-    es8388_output_cfg(1, 1);        /* 喇叭通道和耳机通道打开 */
-    es8388_hpvol_set(20);           /* 设置喇叭 */
-    es8388_spkvol_set(20);          /* 设置耳机 */
-    xl9555_pin_write(SPK_EN_IO, 0); /* 打开喇叭 */
+    // es8388_adda_cfg(1, 0);   /* 打开DAC，关闭ADC */
+    // es8388_input_cfg(0);     /* 录音关闭 */
+    // es8388_output_cfg(1, 1); /* 喇叭通道和耳机通道打开 */
+    // // es8388_hpvol_set(20);    /* 设置喇叭 */
+    // // es8388_spkvol_set(20);   /* 设置耳机 */
+
+    // es8388_hpvol_set(0xff);
+    // es8388_spkvol_set(0xff);
+    // xl9555_pin_write(SPK_EN_IO, 0); /* 打开喇叭 */
+
     vTaskDelay(pdMS_TO_TICKS(20));
     i2s_tx_write(g_audiodev.tbuf, WAV_TX_BUFSIZE); /* 先发送一段无声音的数据 */
 
@@ -271,54 +255,16 @@ uint8_t wav_play_song(uint8_t *fname)
                     xTaskCreate(music, "music", 4096, &MUSICTask_Handler, 5, NULL);
                     taskEXIT_CRITICAL(&my_spinlock);
                 }
-
-                while (res == FR_OK)
+                while (1)
                 {
-                    while (1)
+                    /* 播放结束，下一首 */
+                    if (i2s_play_end == ESP_OK)
                     {
-                        /* 播放结束，下一首 */
-                        if (i2s_play_end == ESP_OK)
-                        {
-                            res = KEY0_PRES;
-                            break;
-                        }
-
-                        // key = xl9555_key_scan(0);
-
-                        // switch (key)
-                        // {
-                        // /* 下一首/上一首 */
-                        // case KEY0_PRES:
-                        // case KEY1_PRES:
-                        //     i2s_play_next_prev = ESP_OK;
-                        //     break;
-                        // /* 暂停/开启 */
-                        // case KEY2_PRES:
-                        //     if ((g_audiodev.status & 0x0F) == 0x03)
-                        //     {
-                        //         audio_stop();
-                        //     }
-                        //     else if ((g_audiodev.status & 0x0F) == 0x00)
-                        //     {
-                        //         audio_start();
-                        //     }
-                        //     break;
-                        // }
-
-                        // if ((g_audiodev.status & 0x0F) == 0x03) /* 暂停不刷新时间 */
-                        // {
-                        //     wav_get_curtime(g_audiodev.file, &wavctrl); /* 得到总时间和当前播放的时间 */
-                        //     audio_msg_show(wavctrl.totsec, wavctrl.cursec, wavctrl.bitrate);
-                        // }
-
-                        vTaskDelay(pdMS_TO_TICKS(10));
+                        // res = KEY0_PRES;
+                        res = FR_OK;
+                        break;
                     }
-
-                    // if (key == KEY1_PRES || key == KEY0_PRES) /* 退出切换歌曲 */
-                    // {
-                    //     res = key;
-                    //     break;
-                    // }
+                    vTaskDelay(pdMS_TO_TICKS(10));
                 }
             }
             else
@@ -342,7 +288,7 @@ uint8_t wav_play_song(uint8_t *fname)
     g_audiodev.file = NULL;
     MUSICTask_Handler = NULL;
     ESP_LOGI("WAVEPLAY", "End playing %s, res: %d", fname, res);
-    
+
     g_playing = false; /* 设置未播放标志位 */
     return res;
 }
